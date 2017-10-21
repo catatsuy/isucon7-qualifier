@@ -1,0 +1,1 @@
+{"pathname":"I/IS/ISHIGAKI/JSON-2.94.tar.gz","version":"2.94","dist":"JSON-2.94","target":"JSON","provides":{"JSON::Backend::PP":{"file":"lib/JSON.pm","version":"2.94"},"JSON":{"version":"2.94","file":"lib/JSON.pm"}},"name":"JSON"}

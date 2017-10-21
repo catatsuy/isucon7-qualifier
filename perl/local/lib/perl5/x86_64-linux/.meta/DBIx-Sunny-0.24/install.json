@@ -1,0 +1,1 @@
+{"pathname":"K/KA/KAZEBURO/DBIx-Sunny-0.24.tar.gz","version":"0.24","dist":"DBIx-Sunny-0.24","target":"DBIx::Sunny","provides":{"DBIx::Sunny":{"file":"lib/DBIx/Sunny.pm","version":"0.24"},"DBIx::Sunny::st":{"file":"lib/DBIx/Sunny.pm"},"DBIx::Sunny::Schema":{"file":"lib/DBIx/Sunny/Schema.pm"},"DBIx::Sunny::db":{"file":"lib/DBIx/Sunny.pm"}},"name":"DBIx::Sunny"}

@@ -13,7 +13,11 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+
+	jsoniter "github.com/json-iterator/go"
 )
+
+var jsoni = jsoniter.ConfigCompatibleWithStandardLibrary
 
 type (
 	// Context represents the context of the current HTTP request. It holds request and
@@ -409,7 +413,7 @@ func (c *context) JSON(code int, i interface{}) (err error) {
 	if c.echo.Debug || pretty {
 		return c.JSONPretty(code, i, "  ")
 	}
-	b, err := json.Marshal(i)
+	b, err := jsoni.Marshal(i)
 	if err != nil {
 		return
 	}

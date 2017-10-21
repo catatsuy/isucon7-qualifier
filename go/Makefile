@@ -6,3 +6,6 @@ build:
 
 vet:
 	go vet ./src/isubata/...
+
+deploy:
+	./deploy.sh

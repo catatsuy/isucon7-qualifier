@@ -15,3 +15,16 @@ make を実行すれば GOPATH を設定しつつ go build するようになっ
 vendor 側が優先されるので、 vendor を消すか dep を使ってバージョンを上げてください。
 
 ライブラリを追加する場合は問題ありません。
+
+
+## セットアップ
+
+```
+ghq get catatsuy/isucon7-qualifier
+ghq look catatsuy/isucon7-qualifier
+mysql -u root -e 'create database isubata'
+scp app01:/home/isucon/isubata/db/isubata.sql ./
+scp app01:/home/isucon/isubata/db/isucon7q-initial-dataset.sql.gz ./
+mysql -u root isubata < ./isubata.sql
+gzcat ./isucon7q-initial-dataset.sql.gz | mysql -u root --default-character-set=utf8mb4
+```

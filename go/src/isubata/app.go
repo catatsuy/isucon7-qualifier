@@ -481,6 +481,16 @@ func queryHaveRead(userID, chID int64) (int64, error) {
 	return h.MessageID, nil
 }
 
+type HaveReadMessage struct {
+	ChannelID int64 `db:"channel_id"`
+	MessageID int64 `db:"message_id"`
+}
+
+type ChannelMessageCount struct {
+	ChannelID int64 `db:channel_id`
+	Count     int64 `db:message_count`
+}
+
 func fetchUnread(c echo.Context) error {
 	userID := sessUserID(c)
 	if userID == 0 {
@@ -494,19 +504,34 @@ func fetchUnread(c echo.Context) error {
 		return err
 	}
 
-	resp := []map[string]interface{}{}
-
 	conn := pool.Get()
 	defer conn.Close()
+	if err != nil {
+		return err
+	}
 
-	for _, chID := range channels {
-		lastID, err := queryHaveRead(userID, chID)
+	rows, err := db.Queryx("SELECT channel_id, message_id FROM haveread WHERE user_id = ?", userID)
+	var h HaveReadMessage
+	if err != nil {
+		return err
+	}
+	channelOf := make(map[int64]HaveReadMessage)
+	for rows.Next() {
+		err := rows.StructScan(&h)
 		if err != nil {
 			return err
 		}
+		channelOf[h.ChannelID] = h
+	}
+
+	resp := []map[string]interface{}{}
+
+	for _, chID := range channels {
+		message, ok := channelOf[chID]
+		lastID := message.MessageID
 
 		var cnt int64
-		if lastID > 0 {
+		if ok {
 			err = db.Get(&cnt,
 				"SELECT COUNT(*) as cnt FROM message WHERE channel_id = ? AND ? < id",
 				chID, lastID)

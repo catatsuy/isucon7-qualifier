@@ -411,6 +411,24 @@ func jsonifyMessage(m Message) (map[string]interface{}, error) {
 	return r, nil
 }
 
+func jsonifyMessageWithUser(m Message, userMap map[int64]User) (map[string]interface{}, error) {
+	u, ok := userMap[m.UserID]
+	if !ok {
+		err := db.Get(&u, "SELECT name, display_name, avatar_icon FROM user WHERE id = ?",
+			m.UserID)
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	r := make(map[string]interface{})
+	r["id"] = m.ID
+	r["user"] = u
+	r["date"] = m.CreatedAt.Format("2006/01/02 15:04:05")
+	r["content"] = m.Content
+	return r, nil
+}
+
 func getMessage(c echo.Context) error {
 	userID := sessUserID(c)
 	if userID == 0 {
@@ -431,10 +449,30 @@ func getMessage(c echo.Context) error {
 		return err
 	}
 
+	userMap := make(map[int64]User, 0)
+	if len(messages) > 0 {
+		userIDs := make([]string, 0, len(messages))
+		for _, m := range messages {
+			userIDs = append(userIDs, strconv.FormatInt(m.UserID, 10))
+		}
+		rows, err := db.Queryx(fmt.Sprintf("SELECT id, name, display_name, avatar_icon FROM user WHERE id IN %s", "("+strings.Join(userIDs, ",")) + ")")
+		if err != nil {
+			return err
+		}
+		for rows.Next() {
+			var user User
+			err := rows.StructScan(&user)
+			if err != nil {
+				return err
+			}
+			userMap[user.ID] = user
+		}
+	}
+
 	response := make([]map[string]interface{}, 0)
 	for i := len(messages) - 1; i >= 0; i-- {
 		m := messages[i]
-		r, err := jsonifyMessage(m)
+		r, err := jsonifyMessageWithUser(m, userMap)
 		if err != nil {
 			return err
 		}

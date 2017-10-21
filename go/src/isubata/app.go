@@ -84,7 +84,7 @@ func init() {
 		db, _ = sqlx.Connect("mysql:trace", dsn)
 		davHost1 = "http://59.106.213.149:8080/"
 		davHost2 = "http://59.106.215.202:8080/"
-		davHost3 = "http://59.106.215.202:8080/"
+		davHost3 = "http://59.106.218.236:8080/"
 	} else {
 		db, _ = sqlx.Connect("mysql", dsn)
 		davHost1 = "http://192.168.101.1:8080/"

@@ -39,8 +39,9 @@ var (
 	develop       *bool
 	pool          *redis.Pool
 
-	davHost1 string
-	davHost2 string
+	davHost1    string
+	davHost2    string
+	bindAddress string
 )
 
 type Renderer struct {
@@ -83,10 +84,12 @@ func init() {
 		db, _ = sqlx.Connect("mysql:trace", dsn)
 		davHost1 = "http://59.106.213.149:8080/"
 		davHost2 = "http://59.106.215.202:8080/"
+		bindAddress = ":5000"
 	} else {
 		db, _ = sqlx.Connect("mysql", dsn)
 		davHost1 = "http://192.168.101.1:8080/"
 		davHost2 = "http://192.168.101.2:8080/"
+		bindAddress = "/home/isucon/app.sock"
 	}
 	for {
 		err := db.Ping()

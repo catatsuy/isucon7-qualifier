@@ -26,5 +26,5 @@ mysql -u root -e 'create database isubata'
 scp app01:/home/isucon/isubata/db/isubata.sql ./
 scp app01:/home/isucon/isubata/db/isucon7q-initial-dataset.sql.gz ./
 mysql -u root isubata < ./isubata.sql
-gzcat ./isucon7q-initial-dataset.sql.gz | mysql -u root --default-character-set=utf8mb4
+gzcat ./isucon7q-initial-dataset.sql.gz | mysql -u root isubata --default-character-set=utf8mb4
 ```

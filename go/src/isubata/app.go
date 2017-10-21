@@ -5,6 +5,7 @@ import (
 	"crypto/sha1"
 	"database/sql"
 	"encoding/binary"
+	"flag"
 	"fmt"
 	"html/template"
 	"io"
@@ -23,6 +24,7 @@ import (
 	"github.com/labstack/echo"
 	"github.com/labstack/echo-contrib/session"
 	"github.com/labstack/echo/middleware"
+	_ "github.com/walf443/go-sql-tracer"
 )
 
 const (
@@ -32,6 +34,7 @@ const (
 var (
 	db            *sqlx.DB
 	ErrBadReqeust = echo.NewHTTPError(http.StatusBadRequest)
+	develop       *bool
 )
 
 type Renderer struct {
@@ -43,6 +46,8 @@ func (r *Renderer) Render(w io.Writer, name string, data interface{}, c echo.Con
 }
 
 func init() {
+	develop = flag.Bool("develop", false, "if development, please enable")
+	flag.Parse()
 	seedBuf := make([]byte, 8)
 	crand.Read(seedBuf)
 	rand.Seed(int64(binary.LittleEndian.Uint64(seedBuf)))
@@ -68,7 +73,11 @@ func init() {
 		db_user, db_password, db_host, db_port)
 
 	log.Printf("Connecting to db: %q", dsn)
-	db, _ = sqlx.Connect("mysql", dsn)
+	if *develop {
+		db, _ = sqlx.Connect("mysql:trace", dsn)
+	} else {
+		db, _ = sqlx.Connect("mysql", dsn)
+	}
 	for {
 		err := db.Ping()
 		if err == nil {

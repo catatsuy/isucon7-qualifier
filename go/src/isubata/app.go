@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	crand "crypto/rand"
 	"crypto/sha1"
 	"database/sql"
@@ -36,7 +37,7 @@ var (
 	ErrBadReqeust = echo.NewHTTPError(http.StatusBadRequest)
 	develop       *bool
 
-	imageDir string
+	davHost string
 )
 
 type Renderer struct {
@@ -77,10 +78,10 @@ func init() {
 	log.Printf("Connecting to db: %q", dsn)
 	if *develop {
 		db, _ = sqlx.Connect("mysql:trace", dsn)
-		imageDir = "../public/icons/"
+		davHost = "http://59.106.218.236:8080/"
 	} else {
 		db, _ = sqlx.Connect("mysql", dsn)
-		imageDir = "/home/isucon/isubata/webapp/public/icons/"
+		davHost = "http://192.168.101.3:8080/"
 	}
 	for {
 		err := db.Ping()
@@ -675,10 +676,16 @@ func postProfile(c echo.Context) error {
 	}
 
 	if avatarName != "" && len(avatarData) > 0 {
-		err = ioutil.WriteFile(imageDir+avatarName, avatarData, 0666)
+		req, err := http.NewRequest("PUT", davHost+avatarName, bytes.NewBuffer(avatarData))
 		if err != nil {
 			return err
 		}
+
+		_, err = http.DefaultClient.Do(req)
+		if err != nil {
+			return err
+		}
+
 		_, err = db.Exec("UPDATE user SET avatar_icon = ? WHERE id = ?", avatarName, self.ID)
 		if err != nil {
 			return err
@@ -732,12 +739,12 @@ func dumpIcon(c echo.Context) error {
 		if err != nil {
 			return err
 		}
-		for _, t := range tmps {
-			err = ioutil.WriteFile(imageDir+t.Name, t.Data, 0666)
-			if err != nil {
-				return err
-			}
-		}
+		// for _, t := range tmps {
+		// err = ioutil.WriteFile(imageDir+t.Name, t.Data, 0666)
+		// if err != nil {
+		// 	return err
+		// }
+		// }
 	}
 	return nil
 }

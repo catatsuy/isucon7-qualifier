@@ -722,9 +722,7 @@ func getIcon(c echo.Context) error {
 }
 
 func dumpIcon(c echo.Context) error {
-	id, _ := strconv.Atoi(c.Param("id"))
-
-	for i := id; i <= 1001; i += 10 {
+	for i := 1; i <= 1001; i += 10 {
 		tmps := make([]struct {
 			Name string `db:"name"`
 			Data []byte `db:"data"`
@@ -791,7 +789,7 @@ func main() {
 	e.GET("add_channel", getAddChannel)
 	e.POST("add_channel", postAddChannel)
 	e.GET("/icons/:file_name", getIcon)
-	e.GET("/dump/:id", dumpIcon)
+	e.GET("/dump", dumpIcon)
 
 	e.Start(":5000")
 }

@@ -460,25 +460,14 @@ func queryChannels() ([]int64, error) {
 	return res, err
 }
 
-func queryHaveRead(userID, chID int64) (int64, error) {
-	type HaveRead struct {
-		UserID    int64     `db:"user_id"`
-		ChannelID int64     `db:"channel_id"`
-		MessageID int64     `db:"message_id"`
-		UpdatedAt time.Time `db:"updated_at"`
-		CreatedAt time.Time `db:"created_at"`
-	}
-	h := HaveRead{}
+type HaveReadMessage struct {
+	ChannelID int64 `db:"channel_id"`
+	MessageID int64 `db:"message_id"`
+}
 
-	err := db.Get(&h, "SELECT * FROM haveread WHERE user_id = ? AND channel_id = ?",
-		userID, chID)
-
-	if err == sql.ErrNoRows {
-		return 0, nil
-	} else if err != nil {
-		return 0, err
-	}
-	return h.MessageID, nil
+type ChannelMessageCount struct {
+	ChannelID int64 `db:channel_id`
+	Count     int64 `db:message_count`
 }
 
 func fetchUnread(c echo.Context) error {
@@ -494,19 +483,34 @@ func fetchUnread(c echo.Context) error {
 		return err
 	}
 
-	resp := []map[string]interface{}{}
-
 	conn := pool.Get()
 	defer conn.Close()
+	if err != nil {
+		return err
+	}
 
-	for _, chID := range channels {
-		lastID, err := queryHaveRead(userID, chID)
+	rows, err := db.Queryx("SELECT channel_id, message_id FROM haveread WHERE user_id = ?", userID)
+	var h HaveReadMessage
+	if err != nil {
+		return err
+	}
+	channelOf := make(map[int64]HaveReadMessage)
+	for rows.Next() {
+		err := rows.StructScan(&h)
 		if err != nil {
 			return err
 		}
+		channelOf[h.ChannelID] = h
+	}
+
+	resp := []map[string]interface{}{}
+
+	for _, chID := range channels {
+		message, ok := channelOf[chID]
+		lastID := message.MessageID
 
 		var cnt int64
-		if lastID > 0 {
+		if ok {
 			err = db.Get(&cnt,
 				"SELECT COUNT(*) as cnt FROM message WHERE channel_id = ? AND ? < id",
 				chID, lastID)

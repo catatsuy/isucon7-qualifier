@@ -402,6 +402,7 @@ func postMessage(c echo.Context) error {
 			return err
 		}
 	}
+	conn.Do("PUBLISH", "message_pubsub", strconv.FormatInt(chanID, 10))
 
 	return c.NoContent(204)
 }
@@ -525,6 +526,15 @@ func fetchUnread(c echo.Context) error {
 		return c.NoContent(http.StatusForbidden)
 	}
 
+	conn := pool.Get()
+	defer conn.Close()
+	pconn := redis.PubSubConn{ Conn: conn }
+	err := pconn.Subscribe("message_pubsub")
+	if err != nil {
+		return err
+	}
+	pconn.Receive()
+
 	time.Sleep(time.Second)
 
 	channels, err := queryChannels()
@@ -532,8 +542,6 @@ func fetchUnread(c echo.Context) error {
 		return err
 	}
 
-	conn := pool.Get()
-	defer conn.Close()
 	if err != nil {
 		return err
 	}

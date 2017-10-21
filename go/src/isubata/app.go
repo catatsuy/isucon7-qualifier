@@ -39,7 +39,8 @@ var (
 	develop       *bool
 	pool          *redis.Pool
 
-	davHost string
+	davHost1 string
+	davHost2 string
 )
 
 type Renderer struct {
@@ -80,10 +81,12 @@ func init() {
 	log.Printf("Connecting to db: %q", dsn)
 	if *develop {
 		db, _ = sqlx.Connect("mysql:trace", dsn)
-		davHost = "http://59.106.218.236:8080/"
+		davHost1 = "http://59.106.213.149:8080/"
+		davHost2 = "http://59.106.215.202:8080/"
 	} else {
 		db, _ = sqlx.Connect("mysql", dsn)
-		davHost = "http://192.168.101.3:8080/"
+		davHost1 = "http://192.168.101.1:8080/"
+		davHost2 = "http://192.168.101.2:8080/"
 	}
 	for {
 		err := db.Ping()
@@ -722,7 +725,15 @@ func postProfile(c echo.Context) error {
 	}
 
 	if avatarName != "" && len(avatarData) > 0 {
-		req, err := http.NewRequest("PUT", davHost+"icons/"+avatarName, bytes.NewBuffer(avatarData))
+		var davURL string
+
+		if avatarName[0] >= '0' && avatarName[0] <= '7' {
+			davURL = davHost1 + "icons/" + avatarName
+		} else {
+			davURL = davHost2 + "icons/" + avatarName
+		}
+
+		req, err := http.NewRequest("PUT", davURL, bytes.NewBuffer(avatarData))
 		if err != nil {
 			return err
 		}

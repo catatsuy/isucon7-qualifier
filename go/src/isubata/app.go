@@ -858,5 +858,5 @@ func main() {
 	e.GET("/icons/:file_name", getIcon)
 	e.GET("/dump", dumpIcon)
 
-	e.Start(":5000")
+	e.Start(bindAddress)
 }

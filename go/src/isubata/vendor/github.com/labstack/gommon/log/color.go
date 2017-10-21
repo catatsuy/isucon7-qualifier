@@ -4,10 +4,14 @@ package log
 
 import (
 	"io"
-
-	"github.com/mattn/go-colorable"
+	"log"
+	"os"
 )
 
 func output() io.Writer {
-	return colorable.NewColorableStdout()
+	devnull, err := os.Open(os.DevNull)
+	if err != nil {
+		log.Fatal(err)
+	}
+	return devnull
 }

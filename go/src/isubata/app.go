@@ -394,6 +394,7 @@ func postMessage(c echo.Context) error {
 	} else {
 		return err
 	}
+	conn.Do("PUBLISH", "message_pubsub", strconv.FormatInt(chanID, 10))
 
 	return c.NoContent(204)
 }

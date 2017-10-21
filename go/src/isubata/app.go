@@ -496,6 +496,9 @@ func fetchUnread(c echo.Context) error {
 
 	resp := []map[string]interface{}{}
 
+	conn := pool.Get()
+	defer conn.Close()
+
 	for _, chID := range channels {
 		lastID, err := queryHaveRead(userID, chID)
 		if err != nil {
@@ -508,10 +511,10 @@ func fetchUnread(c echo.Context) error {
 				"SELECT COUNT(*) as cnt FROM message WHERE channel_id = ? AND ? < id",
 				chID, lastID)
 		} else {
-			conn := pool.Get()
-			defer conn.Close()
-			cnt, err := redis.Int(conn.Do("GET", "channel_message_count:"+strconv.FormatInt(chID, 10)))
-			if err != nil {
+			count, err := redis.Int(conn.Do("GET", "channel_message_count:"+strconv.FormatInt(chID, 10)))
+			if err == nil {
+				cnt = int64(count)
+			} else {
 				err = db.Get(&cnt,
 					"SELECT COUNT(*) as cnt FROM message WHERE channel_id = ?",
 					chID)

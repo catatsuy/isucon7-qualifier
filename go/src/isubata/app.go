@@ -35,6 +35,8 @@ var (
 	db            *sqlx.DB
 	ErrBadReqeust = echo.NewHTTPError(http.StatusBadRequest)
 	develop       *bool
+
+	imageDir string
 )
 
 type Renderer struct {
@@ -75,8 +77,10 @@ func init() {
 	log.Printf("Connecting to db: %q", dsn)
 	if *develop {
 		db, _ = sqlx.Connect("mysql:trace", dsn)
+		imageDir = "../public/icons/"
 	} else {
 		db, _ = sqlx.Connect("mysql", dsn)
+		imageDir = "/home/isucon/isubata/webapp/public/icons/"
 	}
 	for {
 		err := db.Ping()
@@ -671,7 +675,7 @@ func postProfile(c echo.Context) error {
 	}
 
 	if avatarName != "" && len(avatarData) > 0 {
-		_, err := db.Exec("INSERT INTO image (name, data) VALUES (?, ?)", avatarName, avatarData)
+		err = ioutil.WriteFile(imageDir+avatarName, avatarData, 0666)
 		if err != nil {
 			return err
 		}
@@ -715,6 +719,27 @@ func getIcon(c echo.Context) error {
 		return echo.ErrNotFound
 	}
 	return c.Blob(http.StatusOK, mime, data)
+}
+
+func dumpIcon(c echo.Context) error {
+	for i := 1; i <= 1001; i += 10 {
+		tmps := make([]struct {
+			Name string `db:"name"`
+			Data []byte `db:"data"`
+		}, 0, 10)
+
+		err := db.Select(&tmps, "SELECT name, data FROM image WHERE id >= ? AND id < ?", i, i+10)
+		if err != nil {
+			return err
+		}
+		for _, t := range tmps {
+			err = ioutil.WriteFile(imageDir+t.Name, t.Data, 0666)
+			if err != nil {
+				return err
+			}
+		}
+	}
+	return nil
 }
 
 func tAdd(a, b int64) int64 {
@@ -764,6 +789,7 @@ func main() {
 	e.GET("add_channel", getAddChannel)
 	e.POST("add_channel", postAddChannel)
 	e.GET("/icons/:file_name", getIcon)
+	e.GET("/dump", dumpIcon)
 
 	e.Start(":5000")
 }

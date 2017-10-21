@@ -387,12 +387,20 @@ func postMessage(c echo.Context) error {
 
 	conn := pool.Get()
 	defer conn.Close()
-	var cnt int64
-	err = db.Get(&cnt, "SELECT COUNT(*) as cnt FROM message WHERE channel_id = ?", chanID)
+	_, err = redis.Int(conn.Do("GET", "channel_message_count:"+strconv.FormatInt(chanID, 10)))
 	if err == nil {
-		conn.Do("SET", "channel_message_count:"+strconv.FormatInt(chanID, 10), cnt)
+		_, err := conn.Do("INCR", "channel_message_count:"+strconv.FormatInt(chanID, 10))
+		if err != nil {
+			return err
+		}
 	} else {
-		return err
+		var cnt int64
+		err = db.Get(&cnt, "SELECT COUNT(*) as cnt FROM message WHERE channel_id = ?", chanID)
+		if err == nil {
+			conn.Do("SET", "channel_message_count:"+strconv.FormatInt(chanID, 10), cnt)
+		} else {
+			return err
+		}
 	}
 
 	return c.NoContent(204)

@@ -41,6 +41,7 @@ var (
 
 	davHost1 string
 	davHost2 string
+	davHost3 string
 )
 
 type Renderer struct {
@@ -83,10 +84,12 @@ func init() {
 		db, _ = sqlx.Connect("mysql:trace", dsn)
 		davHost1 = "http://59.106.213.149:8080/"
 		davHost2 = "http://59.106.215.202:8080/"
+		davHost3 = "http://59.106.215.202:8080/"
 	} else {
 		db, _ = sqlx.Connect("mysql", dsn)
 		davHost1 = "http://192.168.101.1:8080/"
 		davHost2 = "http://192.168.101.2:8080/"
+		davHost3 = "http://192.168.101.3:8080/"
 	}
 	for {
 		err := db.Ping()
@@ -775,6 +778,8 @@ func postProfile(c echo.Context) error {
 
 		if avatarName[0] >= '0' && avatarName[0] <= '7' {
 			davURL = davHost1 + "icons/" + avatarName
+		} else if avatarName[0] == 'e' || avatarName[0] == 'f' {
+			davURL = davHost3 + "icons/" + avatarName
 		} else {
 			davURL = davHost2 + "icons/" + avatarName
 		}

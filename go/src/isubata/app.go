@@ -676,7 +676,7 @@ func postProfile(c echo.Context) error {
 	}
 
 	if avatarName != "" && len(avatarData) > 0 {
-		req, err := http.NewRequest("PUT", davHost+avatarName, bytes.NewBuffer(avatarData))
+		req, err := http.NewRequest("PUT", davHost+"icons/"+avatarName, bytes.NewBuffer(avatarData))
 		if err != nil {
 			return err
 		}

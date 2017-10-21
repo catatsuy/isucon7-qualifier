@@ -19,6 +19,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/garyburd/redigo/redis"
 	"github.com/go-sql-driver/mysql"
 	"github.com/gorilla/sessions"
 	"github.com/jmoiron/sqlx"
@@ -36,6 +37,7 @@ var (
 	db            *sqlx.DB
 	ErrBadReqeust = echo.NewHTTPError(http.StatusBadRequest)
 	develop       *bool
+	pool          *redis.Pool
 
 	davHost string
 )
@@ -94,7 +96,23 @@ func init() {
 
 	db.SetMaxOpenConns(20)
 	db.SetConnMaxLifetime(5 * time.Minute)
+
+	if *develop {
+		pool = newPool("127.0.0.1:6379")
+	} else {
+		pool = newPool("192.168.101.3:6379")
+	}
+	conn := pool.Get()
+	defer conn.Close()
 	log.Printf("Succeeded to connect db.")
+}
+
+func newPool(addr string) *redis.Pool {
+	return &redis.Pool{
+		MaxIdle:     3,
+		IdleTimeout: 240 * time.Second,
+		Dial:        func() (redis.Conn, error) { return redis.Dial("tcp", addr) },
+	}
 }
 
 type User struct {
@@ -222,6 +240,9 @@ func getInitialize(c echo.Context) error {
 	db.MustExec("DELETE FROM channel WHERE id > 10")
 	db.MustExec("DELETE FROM message WHERE id > 10000")
 	db.MustExec("DELETE FROM haveread")
+	conn := pool.Get()
+	defer conn.Close()
+	conn.Do("FLUSHALL")
 	return c.String(204, "")
 }
 
@@ -361,6 +382,16 @@ func postMessage(c echo.Context) error {
 		return err
 	}
 
+	conn := pool.Get()
+	defer conn.Close()
+	var cnt int64
+	err = db.Get(&cnt, "SELECT COUNT(*) as cnt FROM message WHERE channel_id = ?", chanID)
+	if err == nil {
+		conn.Do("SET", "channel_message_count:"+strconv.FormatInt(chanID, 10), cnt)
+	} else {
+		return err
+	}
+
 	return c.NoContent(204)
 }
 
@@ -465,6 +496,9 @@ func fetchUnread(c echo.Context) error {
 
 	resp := []map[string]interface{}{}
 
+	conn := pool.Get()
+	defer conn.Close()
+
 	for _, chID := range channels {
 		lastID, err := queryHaveRead(userID, chID)
 		if err != nil {
@@ -477,9 +511,17 @@ func fetchUnread(c echo.Context) error {
 				"SELECT COUNT(*) as cnt FROM message WHERE channel_id = ? AND ? < id",
 				chID, lastID)
 		} else {
-			err = db.Get(&cnt,
-				"SELECT COUNT(*) as cnt FROM message WHERE channel_id = ?",
-				chID)
+			count, err := redis.Int(conn.Do("GET", "channel_message_count:"+strconv.FormatInt(chID, 10)))
+			if err == nil {
+				cnt = int64(count)
+			} else {
+				err = db.Get(&cnt,
+					"SELECT COUNT(*) as cnt FROM message WHERE channel_id = ?",
+					chID)
+				if err == nil {
+					conn.Do("SET", "channel_message_count:"+strconv.FormatInt(chID, 10), cnt)
+				}
+			}
 		}
 		if err != nil {
 			return err

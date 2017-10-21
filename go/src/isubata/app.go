@@ -19,6 +19,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/garyburd/redigo/redis"
 	"github.com/go-sql-driver/mysql"
 	"github.com/gorilla/sessions"
 	"github.com/jmoiron/sqlx"
@@ -36,6 +37,7 @@ var (
 	db            *sqlx.DB
 	ErrBadReqeust = echo.NewHTTPError(http.StatusBadRequest)
 	develop       *bool
+	pool          *redis.Pool
 
 	davHost string
 )
@@ -94,7 +96,23 @@ func init() {
 
 	db.SetMaxOpenConns(20)
 	db.SetConnMaxLifetime(5 * time.Minute)
+
+	if *develop {
+		pool = newPool("127.0.0.1:6379")
+	} else {
+		pool = newPool("192.168.101.3:6379")
+	}
+	conn := pool.Get()
+	defer conn.Close()
 	log.Printf("Succeeded to connect db.")
+}
+
+func newPool(addr string) *redis.Pool {
+	return &redis.Pool{
+		MaxIdle:     3,
+		IdleTimeout: 240 * time.Second,
+		Dial:        func() (redis.Conn, error) { return redis.Dial("tcp", addr) },
+	}
 }
 
 type User struct {
@@ -222,6 +240,9 @@ func getInitialize(c echo.Context) error {
 	db.MustExec("DELETE FROM channel WHERE id > 10")
 	db.MustExec("DELETE FROM message WHERE id > 10000")
 	db.MustExec("DELETE FROM haveread")
+	conn := pool.Get()
+	defer conn.Close()
+	conn.Do("FLUSHALL")
 	return c.String(204, "")
 }
 
@@ -361,6 +382,16 @@ func postMessage(c echo.Context) error {
 		return err
 	}
 
+	conn := pool.Get()
+	defer conn.Close()
+	var cnt int64
+	err = db.Get(&cnt, "SELECT COUNT(*) as cnt FROM message WHERE channel_id = ?", chanID)
+	if err == nil {
+		conn.Do("SET", "channel_message_count:"+strconv.FormatInt(chanID, 10), cnt)
+	} else {
+		return err
+	}
+
 	return c.NoContent(204)
 }
 
@@ -429,25 +460,14 @@ func queryChannels() ([]int64, error) {
 	return res, err
 }
 
-func queryHaveRead(userID, chID int64) (int64, error) {
-	type HaveRead struct {
-		UserID    int64     `db:"user_id"`
-		ChannelID int64     `db:"channel_id"`
-		MessageID int64     `db:"message_id"`
-		UpdatedAt time.Time `db:"updated_at"`
-		CreatedAt time.Time `db:"created_at"`
-	}
-	h := HaveRead{}
+type HaveReadMessage struct {
+	ChannelID int64 `db:"channel_id"`
+	MessageID int64 `db:"message_id"`
+}
 
-	err := db.Get(&h, "SELECT * FROM haveread WHERE user_id = ? AND channel_id = ?",
-		userID, chID)
-
-	if err == sql.ErrNoRows {
-		return 0, nil
-	} else if err != nil {
-		return 0, err
-	}
-	return h.MessageID, nil
+type ChannelMessageCount struct {
+	ChannelID int64 `db:channel_id`
+	Count     int64 `db:message_count`
 }
 
 func fetchUnread(c echo.Context) error {
@@ -463,23 +483,49 @@ func fetchUnread(c echo.Context) error {
 		return err
 	}
 
-	resp := []map[string]interface{}{}
+	conn := pool.Get()
+	defer conn.Close()
+	if err != nil {
+		return err
+	}
 
-	for _, chID := range channels {
-		lastID, err := queryHaveRead(userID, chID)
+	rows, err := db.Queryx("SELECT channel_id, message_id FROM haveread WHERE user_id = ?", userID)
+	var h HaveReadMessage
+	if err != nil {
+		return err
+	}
+	channelOf := make(map[int64]HaveReadMessage)
+	for rows.Next() {
+		err := rows.StructScan(&h)
 		if err != nil {
 			return err
 		}
+		channelOf[h.ChannelID] = h
+	}
+
+	resp := []map[string]interface{}{}
+
+	for _, chID := range channels {
+		message, ok := channelOf[chID]
+		lastID := message.MessageID
 
 		var cnt int64
-		if lastID > 0 {
+		if ok {
 			err = db.Get(&cnt,
 				"SELECT COUNT(*) as cnt FROM message WHERE channel_id = ? AND ? < id",
 				chID, lastID)
 		} else {
-			err = db.Get(&cnt,
-				"SELECT COUNT(*) as cnt FROM message WHERE channel_id = ?",
-				chID)
+			count, err := redis.Int(conn.Do("GET", "channel_message_count:"+strconv.FormatInt(chID, 10)))
+			if err == nil {
+				cnt = int64(count)
+			} else {
+				err = db.Get(&cnt,
+					"SELECT COUNT(*) as cnt FROM message WHERE channel_id = ?",
+					chID)
+				if err == nil {
+					conn.Do("SET", "channel_message_count:"+strconv.FormatInt(chID, 10), cnt)
+				}
+			}
 		}
 		if err != nil {
 			return err
@@ -676,7 +722,7 @@ func postProfile(c echo.Context) error {
 	}
 
 	if avatarName != "" && len(avatarData) > 0 {
-		req, err := http.NewRequest("PUT", davHost+avatarName, bytes.NewBuffer(avatarData))
+		req, err := http.NewRequest("PUT", davHost+"icons/"+avatarName, bytes.NewBuffer(avatarData))
 		if err != nil {
 			return err
 		}

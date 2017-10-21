@@ -98,10 +98,12 @@ func init() {
 	db.SetConnMaxLifetime(5 * time.Minute)
 
 	if *develop {
-		pool = newPool("127.0.0.1:3306")
+		pool = newPool("127.0.0.1:6379")
 	} else {
-		pool = newPool("192.168.101.3:3306")
+		pool = newPool("192.168.101.3:6379")
 	}
+	conn := pool.Get()
+	defer conn.Close()
 	log.Printf("Succeeded to connect db.")
 }
 
@@ -238,6 +240,9 @@ func getInitialize(c echo.Context) error {
 	db.MustExec("DELETE FROM channel WHERE id > 10")
 	db.MustExec("DELETE FROM message WHERE id > 10000")
 	db.MustExec("DELETE FROM haveread")
+	conn := pool.Get()
+	defer conn.Close()
+	conn.Do("FLUSHALL")
 	return c.String(204, "")
 }
 
@@ -381,8 +386,10 @@ func postMessage(c echo.Context) error {
 	defer conn.Close()
 	var cnt int64
 	err = db.Get(&cnt, "SELECT COUNT(*) as cnt FROM message WHERE channel_id = ?", chanID)
-	if err != nil {
+	if err == nil {
 		conn.Do("SET", "channel_message_count:"+strconv.FormatInt(chanID, 10), cnt)
+	} else {
+		return err
 	}
 
 	return c.NoContent(204)
@@ -508,7 +515,7 @@ func fetchUnread(c echo.Context) error {
 				err = db.Get(&cnt,
 					"SELECT COUNT(*) as cnt FROM message WHERE channel_id = ?",
 					chID)
-				if err != nil {
+				if err == nil {
 					conn.Do("SET", "channel_message_count:"+strconv.FormatInt(chID, 10), cnt)
 				}
 			}

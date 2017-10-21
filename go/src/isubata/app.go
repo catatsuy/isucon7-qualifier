@@ -261,11 +261,12 @@ func getIndex(c echo.Context) error {
 }
 
 type ChannelInfo struct {
-	ID          int64     `db:"id"`
-	Name        string    `db:"name"`
-	Description string    `db:"description"`
-	UpdatedAt   time.Time `db:"updated_at"`
-	CreatedAt   time.Time `db:"created_at"`
+	ID   int64  `db:"id"`
+	Name string `db:"name"`
+}
+
+type Description struct {
+	Description string `db:"description"`
 }
 
 func getChannel(c echo.Context) error {
@@ -278,23 +279,22 @@ func getChannel(c echo.Context) error {
 		return err
 	}
 	channels := []ChannelInfo{}
-	err = db.Select(&channels, "SELECT * FROM channel ORDER BY id")
+	err = db.Select(&channels, "SELECT id, name FROM channel ORDER BY id")
 	if err != nil {
 		return err
 	}
 
-	var desc string
-	for _, ch := range channels {
-		if ch.ID == int64(cID) {
-			desc = ch.Description
-			break
-		}
+	descs := make([]Description, 0)
+	err = db.Select(&descs, "SELECT description FROM channel WHERE id = ?", cID)
+	if err != nil {
+		return err
 	}
+
 	return c.Render(http.StatusOK, "channel", map[string]interface{}{
 		"ChannelID":   cID,
 		"Channels":    channels,
 		"User":        user,
-		"Description": desc,
+		"Description": descs[0].Description,
 	})
 }
 
@@ -634,7 +634,7 @@ func getHistory(c echo.Context) error {
 	}
 
 	channels := []ChannelInfo{}
-	err = db.Select(&channels, "SELECT * FROM channel ORDER BY id")
+	err = db.Select(&channels, "SELECT id, name FROM channel ORDER BY id")
 	if err != nil {
 		return err
 	}
@@ -656,7 +656,7 @@ func getProfile(c echo.Context) error {
 	}
 
 	channels := []ChannelInfo{}
-	err = db.Select(&channels, "SELECT * FROM channel ORDER BY id")
+	err = db.Select(&channels, "SELECT id, name FROM channel ORDER BY id")
 	if err != nil {
 		return err
 	}

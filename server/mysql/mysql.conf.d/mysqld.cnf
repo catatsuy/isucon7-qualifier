@@ -127,3 +127,8 @@ innodb_file_per_table
 innodb_file_format = Barracuda
 skip-innodb_doublewrite
 #innodb_io_capacity = 2000 # 要検証
+
+# for logging
+slow_query_log = ON
+slow_query_log_file = '/tmp/mysql-slow.log'
+long_query_time = 0

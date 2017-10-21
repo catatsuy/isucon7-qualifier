@@ -13,6 +13,7 @@ import (
 	"io/ioutil"
 	"log"
 	"math/rand"
+	"net"
 	"net/http"
 	"os"
 	"strconv"
@@ -41,6 +42,8 @@ var (
 
 	davHost1 string
 	davHost2 string
+
+	hport int
 )
 
 type Renderer struct {
@@ -83,10 +86,12 @@ func init() {
 		db, _ = sqlx.Connect("mysql:trace", dsn)
 		davHost1 = "http://59.106.213.149:8080/"
 		davHost2 = "http://59.106.215.202:8080/"
+		hport = 5000
 	} else {
 		db, _ = sqlx.Connect("mysql", dsn)
 		davHost1 = "http://192.168.101.1:8080/"
 		davHost2 = "http://192.168.101.2:8080/"
+		hport = 0
 	}
 	for {
 		err := db.Ping()
@@ -855,5 +860,32 @@ func main() {
 	e.GET("/icons/:file_name", getIcon)
 	e.GET("/dump", dumpIcon)
 
-	e.Start(":5000")
+	if hport == 0 {
+		hsock := "/home/isucon/app.sock"
+		ferr := os.Remove(hsock)
+		if ferr != nil {
+			if !os.IsNotExist(ferr) {
+				panic(ferr)
+			}
+		}
+		l, err := net.Listen("unix", hsock)
+		if err != nil {
+			e.Logger.Fatal(err)
+		}
+		cerr := os.Chmod(hsock, 0666)
+		if cerr != nil {
+			panic(cerr)
+		}
+		e.Listener = l
+
+	} else {
+		l, herr := net.ListenTCP("tcp", &net.TCPAddr{Port: hport})
+		if herr != nil {
+			panic(herr)
+		}
+
+		e.Listener = l
+	}
+
+	e.Start("")
 }

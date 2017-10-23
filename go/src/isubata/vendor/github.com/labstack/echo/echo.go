@@ -49,6 +49,7 @@ import (
 	"path/filepath"
 	"reflect"
 	"runtime"
+	"strings"
 	"sync"
 	"time"
 
@@ -720,7 +721,14 @@ func (ln tcpKeepAliveListener) Accept() (c net.Conn, err error) {
 }
 
 func newListener(address string) (*tcpKeepAliveListener, error) {
-	l, err := net.Listen("tcp", address)
+	var l net.Listener
+	var err error
+
+	if strings.Contains(address, ":") {
+		l, err = net.Listen("tcp", address)
+	} else if strings.HasPrefix(address, ".") || strings.HasPrefix(address, "/") {
+		l, err = net.Listen("unix", address)
+	}
 	if err != nil {
 		return nil, err
 	}

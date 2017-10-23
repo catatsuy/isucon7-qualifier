@@ -105,8 +105,15 @@ func init() {
 	} else {
 		pool = newPool("192.168.101.3:6379")
 	}
+
 	conn := pool.Get()
 	defer conn.Close()
+
+	channels, _ := queryChannels()
+	for _, id := range channels {
+		conn.Do("SADD", "channels", strconv.FormatInt(id, 10))
+	}
+
 	log.Printf("Succeeded to connect db.")
 }
 
@@ -246,6 +253,15 @@ func getInitialize(c echo.Context) error {
 	conn := pool.Get()
 	defer conn.Close()
 	conn.Do("FLUSHALL")
+
+	channels, err := queryChannels()
+	if err != nil {
+		return err
+	}
+	for _, id := range channels {
+		conn.Do("SADD", "channels", strconv.FormatInt(id, 10))
+	}
+
 	return c.String(204, "")
 }
 
@@ -527,13 +543,24 @@ func fetchUnread(c echo.Context) error {
 
 	time.Sleep(10 * time.Millisecond)
 
-	channels, err := queryChannels()
+	conn := pool.Get()
+	defer conn.Close()
+	data, err := redis.Values(conn.Do("SMEMBERS", "channels"))
 	if err != nil {
 		return err
 	}
+	channels := make([]int64, 0)
+	for _, datum := range data {
+		chStr, ok := datum.(string)
+		if ok {
+			id, err := strconv.Atoi(chStr)
+			if err != nil {
+				return err
+			}
+			channels = append(channels, int64(id))
+		}
+	}
 
-	conn := pool.Get()
-	defer conn.Close()
 	if err != nil {
 		return err
 	}
@@ -726,6 +753,10 @@ func postAddChannel(c echo.Context) error {
 		return err
 	}
 	lastID, _ := res.LastInsertId()
+
+	conn := pool.Get()
+	defer conn.Close()
+	conn.Do("SADD", "channels", strconv.FormatInt(lastID, 10))
 	return c.Redirect(http.StatusSeeOther,
 		fmt.Sprintf("/channel/%v", lastID))
 }
